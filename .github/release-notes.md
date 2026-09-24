@@ -1,0 +1,3 @@
+把 ChatGPT Excel 的 Basispoints responses 接口接到 CLIProxyAPI。
+
+客户端可以直接请求 `gpt-6-astra`、`gpt-5.6-sol`、`gpt-5.6-luna`、`gpt-5.6-terra`。凭证使用单独的 `type: excel` auth 文件。

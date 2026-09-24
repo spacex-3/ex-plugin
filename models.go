@@ -4,7 +4,7 @@ import "strings"
 
 const (
 	providerID         = "excel"
-	defaultPublicModel = "gpt-5.6-sol-excel"
+	defaultPublicModel = "gpt-5.6-sol"
 	defaultUpstream    = "gpt-5.6-sol"
 )
 
@@ -55,9 +55,6 @@ func publicModelID(model string) string {
 	name, _ := splitModelSuffix(model)
 	if name == "" {
 		return defaultPublicModel
-	}
-	if known, ok := knownModel(name); ok && !strings.HasSuffix(name, "-excel") && name == known.UpstreamID {
-		return known.PublicID
 	}
 	return name
 }

@@ -9,10 +9,12 @@ import (
 
 const (
 	pluginName       = "ex-plugin"
-	pluginVersion    = "0.1.0"
 	defaultResponses = "https://bps.openai.com/basispoints/api/responses"
 	defaultAuthMode  = "chatgpt"
 )
+
+// pluginVersion is overwritten by release builds with -X main.pluginVersion.
+var pluginVersion = "0.1.0"
 
 type pluginConfig struct {
 	Enabled               *bool  `yaml:"enabled"`
@@ -21,7 +23,6 @@ type pluginConfig struct {
 	ToolsVersionID        string `yaml:"tools_version_id"`
 	ForwardPromptCacheKey *bool  `yaml:"forward_prompt_cache_key"`
 	CatalogAtPromptEnd    *bool  `yaml:"catalog_at_prompt_end"`
-	ExposeUpstreamIDs     *bool  `yaml:"expose_upstream_ids"`
 }
 
 func (c pluginConfig) enabled() bool {
@@ -48,10 +49,6 @@ func (c pluginConfig) forwardPromptCacheKey() bool {
 
 func (c pluginConfig) catalogAtPromptEnd() bool {
 	return c.CatalogAtPromptEnd != nil && *c.CatalogAtPromptEnd
-}
-
-func (c pluginConfig) exposeUpstreamIDs() bool {
-	return c.ExposeUpstreamIDs != nil && *c.ExposeUpstreamIDs
 }
 
 var currentConfig atomic.Value

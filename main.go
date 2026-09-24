@@ -175,7 +175,6 @@ func pluginRegistration() map[string]any {
 				map[string]any{"Name": "tools_version_id", "Type": "string", "Description": "Optional bps_tools_version_id forwarded in request metadata."},
 				map[string]any{"Name": "forward_prompt_cache_key", "Type": "boolean", "Description": "Forward prompt_cache_key. Defaults to true."},
 				map[string]any{"Name": "catalog_at_prompt_end", "Type": "boolean", "Description": "Put the tool catalog after history. Defaults to false so the cache prefix stays stable."},
-				map[string]any{"Name": "expose_upstream_ids", "Type": "boolean", "Description": "Also register unsuffixed upstream model ids. Defaults to false to avoid colliding with Codex."},
 			},
 		},
 		"capabilities": map[string]any{
@@ -196,10 +195,8 @@ func modelResponse() map[string]any {
 	}
 	models := make([]any, 0, len(excelModels)*2)
 	for _, model := range excelModels {
+		models = append(models, modelInfo(model.UpstreamID, model))
 		models = append(models, modelInfo(model.PublicID, model))
-		if loadedConfig().exposeUpstreamIDs() {
-			models = append(models, modelInfo(model.UpstreamID, model))
-		}
 	}
 	return map[string]any{"Provider": providerID, "Models": models}
 }

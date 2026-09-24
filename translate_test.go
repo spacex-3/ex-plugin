@@ -50,10 +50,23 @@ func TestResponsesBodyUsesExcelWireShape(t *testing.T) {
 }
 
 func TestMaxEffortFallsBackToXHigh(t *testing.T) {
-	source := mustObject(t, `{"model":"gpt-6-astra-excel(max)","input":"Hello"}`)
+	source := mustObject(t, `{"model":"gpt-6-astra(max)","input":"Hello"}`)
 	body := prepareResponsesBody(source, "")
 	if body["model"] != "gpt-6-astra" || body["reasoning_effort"] != "xhigh" {
 		t.Fatalf("body = %#v", body)
+	}
+}
+
+func TestStandardModelIDsAreRegistered(t *testing.T) {
+	currentConfig.Store(pluginConfig{})
+	raw, err := marshalCompact(modelResponse())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-luna", "gpt-5.6-terra"} {
+		if !strings.Contains(string(raw), `"ID":"`+id+`"`) {
+			t.Fatalf("missing %s in %s", id, raw)
+		}
 	}
 }
 

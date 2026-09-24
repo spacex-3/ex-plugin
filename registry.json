@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "plugins": [
+    {
+      "id": "ex-plugin",
+      "name": "Excel Basispoints",
+      "description": "用 ChatGPT access token 请求 Basispoints Excel responses，并把客户端工具经 run_officejs 交回本地执行。",
+      "author": "spacex-3",
+      "version": "0.1.0",
+      "repository": "https://github.com/spacex-3/ex-plugin",
+      "homepage": "https://github.com/spacex-3/ex-plugin/blob/main/README_CN.md",
+      "license": "MIT",
+      "tags": ["excel", "basispoints", "responses", "chatgpt"],
+      "install": { "type": "github-release" }
+    }
+  ]
+}

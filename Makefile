@@ -1,21 +1,33 @@
+PLUGIN := ex-plugin
+VERSION ?= 0.1.0
+
 UNAME_S := $(shell uname -s)
 ifeq ($(OS),Windows_NT)
-PLUGIN_EXT := dll
+EXT := dll
 else ifeq ($(UNAME_S),Darwin)
-PLUGIN_EXT := dylib
+EXT := dylib
 else
-PLUGIN_EXT := so
+EXT := so
 endif
 
-.PHONY: test build clean
+.PHONY: fmt test build package clean
+
+fmt:
+	gofmt -w .
 
 test:
-	go test ./...
+	go test -race ./...
+	go vet ./...
 
 build:
 	mkdir -p dist
-	go build -buildmode=c-shared -o dist/ex-plugin.$(PLUGIN_EXT) .
-	rm -f dist/ex-plugin.h
+	CGO_ENABLED=1 go build -trimpath -buildvcs=false -buildmode=c-shared \
+		-ldflags "-s -w -X main.pluginVersion=$(VERSION)" \
+		-o dist/$(PLUGIN).$(EXT) .
+	rm -f dist/$(PLUGIN).h
+
+package: build
+	python3 scripts/package.py --version $(VERSION)
 
 clean:
 	rm -rf dist
