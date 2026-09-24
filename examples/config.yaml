@@ -1,0 +1,12 @@
+plugins:
+  enabled: true
+  dir: plugins
+  configs:
+    ex-plugin:
+      enabled: true
+      priority: 100
+      responses_url: https://bps.openai.com/basispoints/api/responses
+      auth_mode: chatgpt
+      forward_prompt_cache_key: true
+      catalog_at_prompt_end: false
+      expose_upstream_ids: false

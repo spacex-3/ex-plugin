@@ -1,0 +1,197 @@
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"sort"
+	"strconv"
+	"strings"
+)
+
+func decodeJSONUseNumber(raw []byte, dest any) error {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	if err := dec.Decode(dest); err != nil {
+		return err
+	}
+	return nil
+}
+
+func decodeObject(raw []byte) (map[string]any, error) {
+	var value any
+	if err := decodeJSONUseNumber(raw, &value); err != nil {
+		return nil, err
+	}
+	object, ok := value.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("json value is not an object")
+	}
+	return object, nil
+}
+
+func marshalCompact(value any) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(value); err != nil {
+		return nil, err
+	}
+	return bytes.TrimRight(buf.Bytes(), "\n"), nil
+}
+
+func mustCompact(value any) string {
+	raw, err := marshalCompact(value)
+	if err != nil {
+		return ""
+	}
+	return string(raw)
+}
+
+func canonicalJSON(value any) string {
+	raw, err := marshalCompact(canonicalize(value))
+	if err != nil {
+		return ""
+	}
+	return string(raw)
+}
+
+func canonicalize(value any) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		keys := make([]string, 0, len(typed))
+		for key := range typed {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		out := make([]any, 0, len(keys)*2)
+		for _, key := range keys {
+			out = append(out, key, canonicalize(typed[key]))
+		}
+		return sortedObject(out)
+	case []any:
+		out := make([]any, len(typed))
+		for i := range typed {
+			out[i] = canonicalize(typed[i])
+		}
+		return out
+	default:
+		return value
+	}
+}
+
+// sortedObject keeps canonical key order when encoded. json.Marshal sorts map
+// keys, so a plain map is already stable; this wrapper exists so nested values
+// are canonicalized before that sort.
+type sortedObject []any
+
+func (o sortedObject) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	buf.WriteByte('{')
+	for i := 0; i+1 < len(o); i += 2 {
+		if i > 0 {
+			buf.WriteByte(',')
+		}
+		key, _ := marshalCompact(o[i])
+		val, err := marshalCompact(o[i+1])
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(key)
+		buf.WriteByte(':')
+		buf.Write(val)
+	}
+	buf.WriteByte('}')
+	return buf.Bytes(), nil
+}
+
+func asObject(value any) (map[string]any, bool) {
+	object, ok := value.(map[string]any)
+	return object, ok
+}
+
+func asArray(value any) ([]any, bool) {
+	array, ok := value.([]any)
+	return array, ok
+}
+
+func asString(value any) (string, bool) {
+	text, ok := value.(string)
+	return text, ok && text != ""
+}
+
+func stringField(object map[string]any, key string) string {
+	text, _ := object[key].(string)
+	return text
+}
+
+func cloneValue(value any) any {
+	raw, err := marshalCompact(value)
+	if err != nil {
+		return value
+	}
+	var out any
+	if err := decodeJSONUseNumber(raw, &out); err != nil {
+		return value
+	}
+	return out
+}
+
+func parseJSONValue(text string) (any, error) {
+	var value any
+	if err := decodeJSONUseNumber([]byte(text), &value); err != nil {
+		return nil, err
+	}
+	return value, nil
+}
+
+func jsonString(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return typed
+	case nil:
+		return ""
+	default:
+		return mustCompact(typed)
+	}
+}
+
+func isJSONInteger(value any) bool {
+	switch typed := value.(type) {
+	case int, int32, int64, uint, uint32, uint64:
+		return true
+	case json.Number:
+		if _, err := typed.Int64(); err == nil {
+			return !strings.ContainsAny(typed.String(), ".eE")
+		}
+		return false
+	case float64:
+		return typed == float64(int64(typed))
+	default:
+		return false
+	}
+}
+
+func isJSONNumber(value any) bool {
+	switch value.(type) {
+	case int, int32, int64, uint, uint32, uint64, float64, json.Number:
+		return true
+	default:
+		return false
+	}
+}
+
+func truncate(text string, limit int) string {
+	if limit <= 0 || len(text) <= limit {
+		return text
+	}
+	return text[:limit]
+}
+
+func atoiDefault(text string, fallback int) int {
+	parsed, err := strconv.Atoi(strings.TrimSpace(text))
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}

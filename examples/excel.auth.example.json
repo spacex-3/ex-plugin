@@ -1,0 +1,7 @@
+{
+  "type": "excel",
+  "access_token": "PASTE_CHATGPT_ACCESS_TOKEN",
+  "account_id": "OPTIONAL_IF_PRESENT_IN_THE_ACCESS_TOKEN",
+  "refresh_token": "OPTIONAL_CODEX_REFRESH_TOKEN",
+  "auth_mode": "chatgpt"
+}
