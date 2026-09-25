@@ -14,7 +14,7 @@ const (
 )
 
 // pluginVersion is overwritten by release builds with -X main.pluginVersion.
-var pluginVersion = "0.1.1"
+var pluginVersion = "0.1.2"
 
 type pluginConfig struct {
 	Enabled               *bool  `yaml:"enabled"`

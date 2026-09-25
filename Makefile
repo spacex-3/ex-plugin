@@ -1,5 +1,5 @@
 PLUGIN := ex-plugin
-VERSION ?= 0.1.1
+VERSION ?= 0.1.2
 
 UNAME_S := $(shell uname -s)
 ifeq ($(OS),Windows_NT)

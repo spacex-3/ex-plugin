@@ -109,6 +109,46 @@ func TestAttachmentURLStaysBesideResponses(t *testing.T) {
 	}
 }
 
+func TestJPEGUploadUsesAllowlistedExtension(t *testing.T) {
+	resetAttachmentCache()
+	var filename, contentType string
+	previous := doHost
+	defer func() { doHost = previous }()
+	doHost = func(method string, payload any) (json.RawMessage, error) {
+		request, _ := payload.(map[string]any)
+		body, _ := request["body"].([]byte)
+		headers, _ := request["headers"].(map[string][]string)
+		disposition := string(body)
+		if idx := strings.Index(disposition, "filename="); idx >= 0 {
+			filename = disposition[idx:]
+		}
+		if values := headers["content-type"]; len(values) > 0 {
+			contentType = values[0]
+		}
+		if !bytesContains(body, []byte("Content-Type: image/jpeg")) {
+			t.Fatalf("part content type missing in %q", body)
+		}
+		return json.Marshal(map[string]any{
+			"status_code": 200,
+			"body":        []byte(`{"openai_file_id":"file_jpg"}`),
+		})
+	}
+	body := imageBody("user", "data:image/jpg;base64,"+base64.StdEncoding.EncodeToString([]byte{0xff, 0xd8, 0xff, 0xd9}))
+	if err := uploadInputImages(imageCred("token-a"), defaultResponses, body); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(filename, "image.jpg") {
+		t.Fatalf("filename = %s", filename)
+	}
+	if !strings.Contains(contentType, "multipart/form-data") {
+		t.Fatalf("content type = %s", contentType)
+	}
+}
+
+func bytesContains(haystack, needle []byte) bool {
+	return strings.Contains(string(haystack), string(needle))
+}
+
 func imageCred(token string) credential {
 	return credential{
 		AccessToken: token,

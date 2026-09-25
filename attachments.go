@@ -121,6 +121,7 @@ func (c *attachmentCache) getOrUpload(key [sha256.Size]byte, upload func() (stri
 
 type inlineImage struct {
 	mediaType string
+	ext       string
 	data      []byte
 }
 
@@ -240,7 +241,11 @@ func decodeInlineImage(dataURL string) (inlineImage, error) {
 	if err != nil || len(data) == 0 {
 		return inlineImage{}, attachmentFail(http.StatusBadRequest, "invalid_image", "input_image data URL contains empty or invalid image data")
 	}
-	return inlineImage{mediaType: mediaType, data: data}, nil
+	normalizedType, ext, ok := imageFileType(mediaType, data)
+	if !ok {
+		return inlineImage{}, attachmentFail(http.StatusBadRequest, "invalid_image", "input_image must be jpeg, png, gif, or webp")
+	}
+	return inlineImage{mediaType: normalizedType, ext: ext, data: data}, nil
 }
 
 func attachmentURL(responsesURL string) (string, error) {
@@ -254,10 +259,7 @@ func attachmentURL(responsesURL string) (string, error) {
 func uploadImage(endpoint string, image inlineImage, cred credential) (string, error) {
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
-	filename := "image"
-	if extensions, _ := mime.ExtensionsByType(image.mediaType); len(extensions) > 0 {
-		filename += extensions[0]
-	}
+	filename := "image" + image.ext
 	partHeaders := make(textproto.MIMEHeader)
 	partHeaders.Set("Content-Disposition", mime.FormatMediaType("form-data", map[string]string{
 		"name":     "file",
@@ -318,4 +320,38 @@ func redactAttachmentError(message string, cred credential, image inlineImage) s
 		}
 	}
 	return truncate(message, 500)
+}
+
+func imageFileType(declared string, data []byte) (string, string, bool) {
+	if mediaType, ext, ok := sniffImage(data); ok {
+		return mediaType, ext, true
+	}
+	switch strings.ToLower(strings.TrimSpace(declared)) {
+	case "image/jpeg", "image/jpg", "image/pjpeg", "image/jfif", "image/jpe":
+		return "image/jpeg", ".jpg", true
+	case "image/png", "image/x-png":
+		return "image/png", ".png", true
+	case "image/gif":
+		return "image/gif", ".gif", true
+	case "image/webp":
+		return "image/webp", ".webp", true
+	default:
+		return "", "", false
+	}
+}
+
+func sniffImage(data []byte) (string, string, bool) {
+	if len(data) >= 3 && data[0] == 0xff && data[1] == 0xd8 && data[2] == 0xff {
+		return "image/jpeg", ".jpg", true
+	}
+	if len(data) >= 8 && bytes.Equal(data[:8], []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a}) {
+		return "image/png", ".png", true
+	}
+	if len(data) >= 6 && (bytes.Equal(data[:6], []byte("GIF87a")) || bytes.Equal(data[:6], []byte("GIF89a"))) {
+		return "image/gif", ".gif", true
+	}
+	if len(data) >= 12 && bytes.Equal(data[:4], []byte("RIFF")) && bytes.Equal(data[8:12], []byte("WEBP")) {
+		return "image/webp", ".webp", true
+	}
+	return "", "", false
 }
