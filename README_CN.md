@@ -14,6 +14,8 @@ Basispoints 不接受请求里的 `tools`，带上会直接 422。插件会拿�
 
 `reasoning.effort` 没有 `max`。`max` 和 `ultra` 会改成 `xhigh`。
 
+用户消息里的内嵌 `data:` 图片会先上传到与 responses 同目录的 `attachments`，请求体里只保留返回的 `file_id`。Basispoints 不接受把图片字节直接放进 responses。
+
 ## 模型
 
 插件直接注册这些标准模型名，上游请求也使用同一个名字：

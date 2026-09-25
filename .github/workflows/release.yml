@@ -34,7 +34,7 @@ jobs:
           assert plugin['id'] == 'ex-plugin'
           assert plugin['repository'] == 'https://github.com/spacex-3/ex-plugin'
           assert plugin['install']['type'] == 'github-release'
-          assert plugin['version'] == '0.1.0'
+          assert plugin['version'] == '0.1.1'
           PY
 
   build:

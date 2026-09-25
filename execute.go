@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -42,6 +43,9 @@ func execute(raw []byte, stream bool) ([]byte, error) {
 		return errorEnvelope("invalid_api_key", "excel auth is not configured", http.StatusUnauthorized), nil
 	}
 	body := prepareResponsesBody(source, cred.ToolsVersionID)
+	if err := uploadInputImages(cred, loadedConfig().responsesURL(), body); err != nil {
+		return attachmentErrorEnvelope(err), nil
+	}
 	upstream, err := marshalCompact(body)
 	if err != nil {
 		return errorEnvelope("invalid_request", err.Error(), http.StatusBadRequest), nil
@@ -85,17 +89,17 @@ func chatToResponses(source map[string]any) map[string]any {
 			continue
 		}
 		role := stringField(message, "role")
-		text := outputText(message["content"])
 		switch role {
 		case "system", "developer":
-			if text != "" {
+			if text := outputText(message["content"]); text != "" {
 				instructions = append(instructions, text)
 			}
 		case "tool":
+			output := chatToolOutput(message["content"])
 			input = append(input, map[string]any{
 				"type":    "function_call_output",
 				"call_id": firstString(message, "tool_call_id", "call_id"),
-				"output":  text,
+				"output":  output,
 			})
 		case "assistant":
 			if calls, ok := message["tool_calls"].([]any); ok {
@@ -124,12 +128,12 @@ func chatToResponses(source map[string]any) map[string]any {
 					})
 				}
 			}
-			if text != "" {
-				input = append(input, messageItem("assistant", text))
+			if converted := responsesMessageFromChat("assistant", message["content"]); converted != nil {
+				input = append(input, converted)
 			}
 		default:
-			if text != "" {
-				input = append(input, messageItem("user", text))
+			if converted := responsesMessageFromChat("user", message["content"]); converted != nil {
+				input = append(input, converted)
 			}
 		}
 	}
@@ -162,6 +166,121 @@ func chatToResponses(source map[string]any) map[string]any {
 		out["tools"] = converted
 	}
 	return out
+}
+
+func responsesMessageFromChat(role string, content any) map[string]any {
+	if text, ok := content.(string); ok {
+		if text == "" {
+			return nil
+		}
+		return messageItem(role, text)
+	}
+	parts, ok := content.([]any)
+	if !ok {
+		text := outputText(content)
+		if text == "" {
+			return nil
+		}
+		return messageItem(role, text)
+	}
+	converted := make([]any, 0, len(parts))
+	for _, part := range parts {
+		switch item := part.(type) {
+		case string:
+			if item != "" {
+				kind := "input_text"
+				if role == "assistant" {
+					kind = "output_text"
+				}
+				converted = append(converted, map[string]any{"type": kind, "text": item})
+			}
+		case map[string]any:
+			if mapped := chatPartToResponses(role, item); mapped != nil {
+				converted = append(converted, mapped)
+			}
+		}
+	}
+	if len(converted) == 0 {
+		return nil
+	}
+	return map[string]any{"type": "message", "role": role, "content": converted}
+}
+
+func chatPartToResponses(role string, part map[string]any) map[string]any {
+	kind := strings.ToLower(strings.TrimSpace(stringField(part, "type")))
+	switch kind {
+	case "image_url":
+		imageURL := imageURLString(map[string]any{"image_url": part["image_url"]})
+		if imageURL == "" {
+			return nil
+		}
+		out := map[string]any{"type": "input_image", "image_url": imageURL}
+		if detail := strings.TrimSpace(stringField(part, "detail")); detail != "" {
+			out["detail"] = detail
+		}
+		return out
+	case "input_image":
+		out := cloneObject(part)
+		if imageURL := imageURLString(part); imageURL != "" {
+			out["image_url"] = imageURL
+		}
+		return out
+	default:
+		text, ok := part["text"].(string)
+		if !ok || text == "" {
+			return nil
+		}
+		contentType := "input_text"
+		if role == "assistant" || kind == "output_text" {
+			contentType = "output_text"
+		}
+		return map[string]any{"type": contentType, "text": text}
+	}
+}
+
+func chatToolOutput(content any) any {
+	parts, ok := content.([]any)
+	if !ok || !contentHasImage(parts) {
+		text := outputText(content)
+		if text == "" {
+			if content == nil {
+				return ""
+			}
+			if _, isString := content.(string); isString {
+				return ""
+			}
+		}
+		return text
+	}
+	return content
+}
+
+func contentHasImage(parts []any) bool {
+	for _, part := range parts {
+		item, ok := part.(map[string]any)
+		if !ok {
+			continue
+		}
+		kind := strings.ToLower(stringField(item, "type"))
+		if kind == "image_url" || kind == "input_image" || imageURLString(item) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func attachmentErrorEnvelope(err error) []byte {
+	status := http.StatusBadGateway
+	code := "attachment_upload_error"
+	var statusCoder interface{ StatusCode() int }
+	if errors.As(err, &statusCoder) && statusCoder.StatusCode() >= 400 && statusCoder.StatusCode() <= 599 {
+		status = statusCoder.StatusCode()
+	}
+	var coder interface{ Code() string }
+	if errors.As(err, &coder) && strings.TrimSpace(coder.Code()) != "" {
+		code = coder.Code()
+	}
+	return errorEnvelope(code, err.Error(), status)
 }
 
 func executeOnce(headers map[string][]string, order []string, body []byte, source map[string]any, publicModel string) ([]byte, error) {
