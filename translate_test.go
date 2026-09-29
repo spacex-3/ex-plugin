@@ -70,6 +70,73 @@ func TestStandardModelIDsAreRegistered(t *testing.T) {
 	}
 }
 
+func TestGeneratedImageIDReplaysPreviousResult(t *testing.T) {
+	resetGeneratedImages()
+	png := "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+	id := "ig_0992f3c8f301a131016aaf90b83a3487d1b6b4abf5108a35b5"
+	rememberGeneratedImages(map[string]any{
+		"type":   "image_generation_call",
+		"id":     id,
+		"status": "completed",
+		"result": png,
+	})
+	body := prepareResponsesBody(mustObject(t, `{
+		"model":"gpt-5.6-sol",
+		"input":[
+			{"type":"message","role":"user","content":[{"type":"input_text","text":"again"}]},
+			{"type":"item_reference","id":"`+id+`"},
+			{"type":"message","role":"assistant","content":[
+				{"type":"output_text","text":"here"},
+				{"type":"output_image","id":"`+id+`"}
+			]}
+		]
+	}`), "")
+	raw := canonicalJSON(body["input"])
+	if strings.Contains(raw, id) || strings.Contains(raw, "item_reference") || strings.Contains(raw, "image_generation_call") || strings.Contains(raw, "output_image") {
+		t.Fatalf("image id leaked: %s", raw)
+	}
+	if strings.Count(raw, png) != 2 || !strings.Contains(raw, "input_image") || !strings.Contains(raw, "again") || !strings.Contains(raw, "here") {
+		t.Fatalf("image was not replayed: %s", raw)
+	}
+}
+
+func TestInlineGeneratedImageResultIsReplayed(t *testing.T) {
+	resetGeneratedImages()
+	png := "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+	body := prepareResponsesBody(mustObject(t, `{
+		"model":"gpt-5.6-sol",
+		"input":[
+			{"type":"image_generation_call","id":"ig_inline","status":"completed","result":"`+png+`"},
+			{"type":"message","role":"user","content":[{"type":"input_text","text":"draw"}]}
+		]
+	}`), "")
+	raw := canonicalJSON(body["input"])
+	if strings.Contains(raw, "ig_inline") || strings.Contains(raw, "image_generation_call") {
+		t.Fatalf("inline image id leaked: %s", raw)
+	}
+	if !strings.Contains(raw, png) || !strings.Contains(raw, "draw") {
+		t.Fatalf("inline image was not replayed: %s", raw)
+	}
+}
+
+func TestUnknownGeneratedImageIDIsDropped(t *testing.T) {
+	resetGeneratedImages()
+	body := prepareResponsesBody(mustObject(t, `{
+		"model":"gpt-5.6-sol",
+		"input":[
+			{"type":"message","role":"user","content":[{"type":"input_text","text":"keep"}]},
+			{"type":"item_reference","id":"ig_missing"}
+		]
+	}`), "")
+	raw := canonicalJSON(body["input"])
+	if strings.Contains(raw, "ig_missing") || strings.Contains(raw, "item_reference") {
+		t.Fatalf("missing image id leaked: %s", raw)
+	}
+	if !strings.Contains(raw, "keep") {
+		t.Fatalf("text was dropped: %s", raw)
+	}
+}
+
 func TestTurnIdentityStaysConstantAcrossToolResults(t *testing.T) {
 	resetNativeCalls()
 	first := prepareResponsesBody(mustObject(t, `{
