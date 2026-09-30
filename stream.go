@@ -142,7 +142,6 @@ func (s *toolStream) consumeOne(event sseEvent) [][]byte {
 	if !ok {
 		return nil
 	}
-	rememberGeneratedImages(object)
 	eventType := strings.ToLower(strings.TrimSpace(event.Name))
 	if eventType == "" {
 		eventType = strings.ToLower(strings.TrimSpace(stringField(object, "type")))

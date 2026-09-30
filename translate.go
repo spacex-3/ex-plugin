@@ -20,7 +20,6 @@ func prepareResponsesBody(source map[string]any, toolsVersion string) map[string
 	}
 	rawInput := source["input"]
 	tools := clientTools(source)
-	rememberGeneratedImages(rawInput)
 	inputItems := translateInputItems(rawInput, tools)
 	historyRoot := conversationFingerprint(inputItems)
 
@@ -130,10 +129,6 @@ func translateItemList(raw []any, tools map[string]toolSpec) []any {
 		}
 		object = stripPassthrough(object)
 		itemType := strings.ToLower(strings.TrimSpace(stringField(object, "type")))
-		if replayed, handled := replayGeneratedImageItem(object); handled {
-			result = append(result, replayed...)
-			continue
-		}
 		switch itemType {
 		case "function_call", "custom_tool_call":
 			result = append(result, translateCallItem(object, origins))
@@ -150,7 +145,7 @@ func translateItemList(raw []any, tools map[string]toolSpec) []any {
 		case "item_reference":
 			continue
 		default:
-			result = append(result, restoreGeneratedImageParts(object)...)
+			result = append(result, object)
 		}
 	}
 	return result

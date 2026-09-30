@@ -3,4 +3,3 @@
 客户端可以直接请求 `gpt-6-astra`、`gpt-5.6-sol`、`gpt-5.6-luna`、`gpt-5.6-terra`。凭证使用单独的 `type: excel` auth 文件。
 
 用户消息里的 data URL 图片会先上传到 Basispoints attachments，再以 file_id 发送。上传文件名只使用 .jpg、.png、.gif、.webp。
-上一轮生成的图片会按 ig_ 编号暂存。下一轮只带回编号时，插件把图像数据重新附上，不再让上游按未保存的编号取图。

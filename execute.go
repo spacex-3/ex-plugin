@@ -460,7 +460,6 @@ func completedResponse(resp httpResponse) (map[string]any, error) {
 			if eventName == "" {
 				eventName = strings.ToLower(stringField(object, "type"))
 			}
-			rememberGeneratedImages(object)
 			if eventName == "response.completed" {
 				if response, ok := object["response"].(map[string]any); ok {
 					completed = response
@@ -477,10 +476,8 @@ func completedResponse(resp httpResponse) (map[string]any, error) {
 		return nil, fmt.Errorf("upstream response was not JSON")
 	}
 	if response, ok := object["response"].(map[string]any); ok && stringField(object, "type") == "response.completed" {
-		rememberGeneratedImages(response)
 		return response, nil
 	}
-	rememberGeneratedImages(object)
 	return object, nil
 }
 
