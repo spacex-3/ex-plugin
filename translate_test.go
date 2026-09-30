@@ -70,6 +70,30 @@ func TestStandardModelIDsAreRegistered(t *testing.T) {
 	}
 }
 
+func TestConfiguredModelAliasRewritesUpstreamAndIsRegistered(t *testing.T) {
+	previous := loadedConfig()
+	t.Cleanup(func() { currentConfig.Store(previous) })
+	currentConfig.Store(pluginConfig{ModelAliases: map[string]string{
+		"gpt-5.5": "gpt-5.6-sol-excel",
+		"gpt-5.4": "gpt-5.5",
+	}})
+	body := prepareResponsesBody(mustObject(t, `{"model":"gpt-5.5(high)","input":"hi"}`), "")
+	if body["model"] != "gpt-5.6-sol" || body["reasoning_effort"] != "high" {
+		t.Fatalf("alias route = %#v", body["model"])
+	}
+	chained := prepareResponsesBody(mustObject(t, `{"model":"excel/gpt-5.4","input":"hi"}`), "")
+	if chained["model"] != "gpt-5.6-sol" {
+		t.Fatalf("chained alias = %#v", chained["model"])
+	}
+	raw, err := marshalCompact(modelResponse())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"ID":"gpt-5.5"`) || !strings.Contains(string(raw), `"ID":"gpt-5.4"`) {
+		t.Fatalf("alias missing from catalog: %s", raw)
+	}
+}
+
 func TestTurnIdentityStaysConstantAcrossToolResults(t *testing.T) {
 	resetNativeCalls()
 	first := prepareResponsesBody(mustObject(t, `{

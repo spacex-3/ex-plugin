@@ -175,6 +175,7 @@ func pluginRegistration() map[string]any {
 				map[string]any{"Name": "tools_version_id", "Type": "string", "Description": "Optional bps_tools_version_id forwarded in request metadata."},
 				map[string]any{"Name": "forward_prompt_cache_key", "Type": "boolean", "Description": "Forward prompt_cache_key. Defaults to true."},
 				map[string]any{"Name": "catalog_at_prompt_end", "Type": "boolean", "Description": "Put the tool catalog after history. Defaults to false so the cache prefix stays stable."},
+				map[string]any{"Name": "model_aliases", "Type": "object", "Description": "Map a client model id to an Excel model. Example: gpt-5.5 -> gpt-5.6-sol-excel."},
 			},
 		},
 		"capabilities": map[string]any{
@@ -194,9 +195,20 @@ func modelResponse() map[string]any {
 		return map[string]any{"Provider": providerID, "Models": []any{}}
 	}
 	models := make([]any, 0, len(excelModels)*2)
+	seen := map[string]bool{}
+	add := func(id string, model excelModel) {
+		if id == "" || seen[id] {
+			return
+		}
+		seen[id] = true
+		models = append(models, modelInfo(id, model))
+	}
 	for _, model := range excelModels {
-		models = append(models, modelInfo(model.UpstreamID, model))
-		models = append(models, modelInfo(model.PublicID, model))
+		add(model.UpstreamID, model)
+		add(model.PublicID, model)
+	}
+	for _, alias := range configuredAliasIDs() {
+		add(alias.ID, alias.Model)
 	}
 	return map[string]any{"Provider": providerID, "Models": models}
 }

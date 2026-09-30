@@ -14,15 +14,16 @@ const (
 )
 
 // pluginVersion is overwritten by release builds with -X main.pluginVersion.
-var pluginVersion = "0.1.2"
+var pluginVersion = "0.1.4"
 
 type pluginConfig struct {
-	Enabled               *bool  `yaml:"enabled"`
-	ResponsesURL          string `yaml:"responses_url"`
-	AuthMode              string `yaml:"auth_mode"`
-	ToolsVersionID        string `yaml:"tools_version_id"`
-	ForwardPromptCacheKey *bool  `yaml:"forward_prompt_cache_key"`
-	CatalogAtPromptEnd    *bool  `yaml:"catalog_at_prompt_end"`
+	Enabled               *bool             `yaml:"enabled"`
+	ResponsesURL          string            `yaml:"responses_url"`
+	AuthMode              string            `yaml:"auth_mode"`
+	ToolsVersionID        string            `yaml:"tools_version_id"`
+	ForwardPromptCacheKey *bool             `yaml:"forward_prompt_cache_key"`
+	CatalogAtPromptEnd    *bool             `yaml:"catalog_at_prompt_end"`
+	ModelAliases          map[string]string `yaml:"model_aliases"`
 }
 
 func (c pluginConfig) enabled() bool {
@@ -83,4 +84,16 @@ func configure(raw []byte) error {
 	}
 	currentConfig.Store(cfg)
 	return nil
+}
+
+func (c pluginConfig) modelAlias(name string) (string, bool) {
+	name = strings.TrimSpace(name)
+	if name == "" || len(c.ModelAliases) == 0 {
+		return "", false
+	}
+	target := strings.TrimSpace(c.ModelAliases[name])
+	if target == "" || target == name {
+		return "", false
+	}
+	return target, true
 }

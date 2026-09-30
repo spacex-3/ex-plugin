@@ -27,6 +27,15 @@ Basispoints 不接受请求里的 `tools`，带上会直接 422。插件会拿�
 
 `gpt-6-astra-excel` 这类旧别名仍然接受，发出去之前会去掉 `-excel`。`gpt-6-sol`、`gpt-6-luna`、`gpt-6-terra`、`gpt-5.5` 在这个后端返回 403，不注册。和 Codex 渠道的同名模型由你自己的优先级决定走哪边。
 
+`model_aliases` 可以把客户端使用的名字指到上面任一模型。例如客户端请求 `gpt-5.5`，实际上游发出 `gpt-5.6-sol`：
+
+```yaml
+model_aliases:
+  gpt-5.5: gpt-5.6-sol-excel
+```
+
+目标写成 `gpt-5.6-sol` 也可以。思考等级后缀仍然有效，`gpt-5.5(high)` 会带上 `high`。
+
 ## 配置
 
 ```yaml

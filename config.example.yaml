@@ -9,3 +9,5 @@ plugins:
       auth_mode: chatgpt
       forward_prompt_cache_key: true
       catalog_at_prompt_end: false
+      model_aliases:
+        gpt-5.5: gpt-5.6-sol-excel

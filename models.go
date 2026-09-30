@@ -1,6 +1,9 @@
 package main
 
-import "strings"
+import (
+	"sort"
+	"strings"
+)
 
 const (
 	providerID         = "excel"
@@ -64,6 +67,7 @@ func upstreamModelID(model string) string {
 	if name == "" {
 		return defaultUpstream
 	}
+	name = applyModelAlias(name)
 	if strings.HasSuffix(name, "-excel") {
 		if known, ok := knownModel(name); ok {
 			return known.UpstreamID
@@ -113,4 +117,67 @@ func atoiOK(text string) (int, bool) {
 		return 0, false
 	}
 	return parsed, true
+}
+
+func applyModelAlias(name string) string {
+	seen := map[string]bool{}
+	for hops := 0; hops < 4; hops++ {
+		if seen[name] {
+			return name
+		}
+		seen[name] = true
+		target, ok := loadedConfig().modelAlias(name)
+		if !ok {
+			return name
+		}
+		name = target
+	}
+	return name
+}
+
+type aliasModel struct {
+	ID    string
+	Model excelModel
+}
+
+func configuredAliasIDs() []aliasModel {
+	cfg := loadedConfig()
+	if len(cfg.ModelAliases) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(cfg.ModelAliases))
+	for key := range cfg.ModelAliases {
+		key = strings.TrimSpace(key)
+		if key != "" {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+	out := make([]aliasModel, 0, len(keys))
+	for _, key := range keys {
+		target, ok := cfg.modelAlias(key)
+		if !ok {
+			continue
+		}
+		model, ok := modelForAliasTarget(target)
+		if !ok {
+			model = excelModel{PublicID: target, UpstreamID: target, Display: key, Context: 272000}
+		}
+		out = append(out, aliasModel{ID: key, Model: model})
+	}
+	return out
+}
+
+func modelForAliasTarget(target string) (excelModel, bool) {
+	name := strings.TrimSpace(target)
+	if strings.HasSuffix(name, "-excel") {
+		if known, ok := knownModel(name); ok {
+			return known, true
+		}
+		name = strings.TrimSuffix(name, "-excel")
+	}
+	if known, ok := knownModel(name); ok {
+		return known, true
+	}
+	return excelModel{}, false
 }
